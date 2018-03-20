@@ -1,5 +1,7 @@
 import pyautogui, sys
-print('Press Ctrl-C to quit.')
+
+
+print('X and Y coords of mouse for pyautogui use; 0,0 is top right.')
 try:
     while True:
         x, y = pyautogui.position()
