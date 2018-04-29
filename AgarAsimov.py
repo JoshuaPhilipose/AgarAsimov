@@ -4,30 +4,32 @@ import pyautogui
 from pyautogui import typewrite
 import random
 import numpy
-
-# Loading the Game
-url = 'http:www.agar.io'
-chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
-webbrowser.get(chrome_path).open(url)
-time.sleep(7)
-
-# Logging In; Co-ords are specific to 2160 x 1440 resolution screens with standard zoom
-typewrite('AgarAsimov v2.8', interval=0.25) # Google Chrome remembers my username from last session
-time.sleep(random.randint(1, 3))
-x = 990
-y = 370
+from PIL import Image
+from PIL import ImageGrab
 
 mouseSpeed = .2
-
-pyautogui.moveTo(x, y, mouseSpeed, pyautogui.easeOutQuad)
-pyautogui.click()
-
-# Now we need to actually play!
-time.sleep(2)
-im2 = pyautogui.screenshot('my_screenshot.png')
 center = (1080, 760)
+topBuffer = 140
+# Loading the Game
+def loadGame():
+    url = 'http:www.agar.io'
+    chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
+    webbrowser.get(chrome_path).open(url)
+    time.sleep(3)
 
-#TODO: REPLACE WITH ACTUAL BRAIN
+    # Logging In; Co-ords are specific to 2160 x 1440 resolution screens with standard zoom
+    typewrite('AgarAsimov v2.8', interval=0.25) # Google Chrome remembers my username from last session
+    time.sleep(1)
+    x = 990
+    y = 370
+
+    pyautogui.moveTo(x, y, mouseSpeed, pyautogui.easeOutQuad)
+    pyautogui.click()
+
+    # Now we need to actually play!
+    time.sleep(.2)
+
+    GameState = pyautogui.screenshot('GameState.png')
 
 def translateAndMove(x, y):
     #Takes raw pyautogui coords and moves mouse to the appropriate location in a 300 px radius of the center of the game
@@ -47,8 +49,6 @@ def translateAndMove(x, y):
 
     #Fourth step: translating back to pyautogui coordinates and moving
     tup = regToPyCoords(x, y)
-    # print(tup[0])
-    # print(tup[1])
     pyautogui.moveTo(tup[0], tup[1], mouseSpeed, pyautogui.easeOutQuad)
 
 def pyToRegCoords(x, y):
@@ -69,5 +69,35 @@ def sampleMovement():
         translateAndMove(x, y)
         time.sleep(1)
 
+def flee(x, y):
+    # Flees in the direction opposite the given coordinate
+    tup = pyToRegCoords(x, y)
+    tup[0] = -tup[0]
+    tup[1] = -tup[1]
+    tup = regToPyCoords(tup[0], tup[1])
+    translateAndMove(tup[0], tup[1])
+
+def crossMeasure(x, y):
+    # Take the input dot, measure the vertical and horizontal distance, return the max size.
+    x = x + 1
+    y = y + 1
+
+def letsPlay():
+    time.clock()
+    GameState = pyautogui.screenshot('GameState.png')
+    x = 0
+    for x in range(220, 1920, 15):
+        for y in range(360, 1220, 15):
+            color = GameState.getpixel((x, y))
+            x += 1
+            # print color
+    print("TOTAL NUMBER:")
+    print x
+    print time.clock()
+
+
+
 if __name__ == '__main__':
-    sampleMovement()
+    #loadGame()
+    letsPlay()
+    #sampleMovement()
