@@ -74,7 +74,7 @@ def regToPyCoords(x, y):
 def sampleMovement():
     for i in range(5):
         x = random.randint(1, 2160)
-        y = random.randint(1, 1440) + 170
+        y = random.randint(1, 1440) + topBuffer
         translateAndMove(x, y)
         time.sleep(1)
 
@@ -121,8 +121,8 @@ def crossMeasure(x, y, GameState):
         return 0
 
 def letsPlay():
-    # TODO: So this scans the screen in a smaller range around the bot, and returns the coords/measurement of
-    #       the non-background particles.
+    # TODO: So this scans the screen in a smaller range around the bot, and plays based off that.
+    #
     #       1) Need to skip a certain scan length to avoid re-measuring/scanning the same unit many times
     #       2) Need to ensure measurement size is accurate
     #       3) Need to find a way to distinguuish dots from viruses.
