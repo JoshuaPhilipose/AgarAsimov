@@ -12,6 +12,7 @@ from PIL import ImageGrab
 mouseSpeed = .4
 center = (1080, 760)
 topBuffer = 140
+bottomBound = 1380
 backgroundTileColor = (242, 251, 255)
 
 # Loading the Game
@@ -19,8 +20,8 @@ def loadGame():
     url = 'http:www.agar.io'
     chrome_path = 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe %s'
     webbrowser.get(chrome_path).open(url)
-    for i in range(1, 11):
-        print "AI Takes Over in: " , (11 - i)
+    for i in range(1, 16):
+        print "AI Takes Over in: " , (16 - i)
         time.sleep(1)
 
     #TODO: Below code caused bot to be flagged as a bot. Implement login sequence that beats Miniclip's bot-scanner.
@@ -49,6 +50,7 @@ def translateAndMove(x, y):
     y = tup[1]
 
     #Second step: translating to unit polar coordinates with r = 300 px
+    #We just set r = 300 because we want that to be the radius, don't care what it actually is
     r = 300
     angle = numpy.arctan2(y, x)
 
@@ -116,33 +118,51 @@ def crossMeasure(x, y, GameState):
 
     #Handling edge case in case the coordinate of a line is inputted
     if (maxX > 20 and maxY > 20):
-        return (maxX, maxY)
+        return (maxX, maxY, max(maxX, maxY))
     else:
         return 0
 
 def letsPlay():
     # TODO: So this scans the screen in a smaller range around the bot, and plays based off that.
     #
-    #       1) Need to skip a certain scan length to avoid re-measuring/scanning the same unit many times
+    #       1) Need to skip a certain scan length to avoid re-measuring/scanning the same unit many times - DONE
+    #       1.5) Need to initialize skipping self
     #       2) Need to ensure measurement size is accurate
     #       3) Need to find a way to distinguuish dots from viruses.
     #       4) Need to actually implement the AI lol
 
+    # TODO: The AI is essentially solving this problem:
+    #           Given the input gamestate, which output direction should the agent go in to maximize ouur score?
+    #       Training Data should be stored in separate file to allow for multi-session memory
+    #       3 Possible outputs are mouse movement, splitting, and shooting out a blob
+    #       Can store smaller blobs rewards as measurement size, store larger ones as negative size
+    #       First priority is staying alive, second is growing larger - utilize living reward to disincentivize hiding 24/7
+
+    # Initializing
     time.clock()
     GameState = pyautogui.screenshot('GameState.png')
     z = 0
-    for x in xrange(220, 1920, 15):
-        for y in xrange(360, 1220, 15):
+
+    skipRanges = [(1807, 2142, 152, 567)] # Initialized with the coordinates of the leaderboard
+    for x in xrange(0, 2160, 15): # For smaller window use 220 to 1920
+        for y in xrange(topBuffer, bottomBound, 15): # For smaller window use 360 to 1220
+            # Skipping ranges where we already know something is there
+            for skipRange in skipRanges:
+                if (x > skipRange[0] and x < skipRange[1]):
+                    if (y > skipRange[2] and y < skipRange[3]):
+                        x = min(skipRange[1], 2159)
+                        y = min(skipRange[3], bottomBound)
+
+            # Identifying and measuring units
             color = GameState.getpixel((x, y))
             if color != backgroundTileColor:
                 measure = crossMeasure(x, y, GameState)
                 if measure != 0:
-                    # x += measure[0]
-                    # y += measure[1]
-                    # if
+                    skipRanges.append((x, x + measure[2] / 2, y, y + measure[2])) # Appends another range of values to skip over
                     print "X, Y, measure: ", x, " ", y, " ", measure
                     z += 1
-            #print color
+
+    # Key Performance Indicators
     print("TOTAL NUMBER of UNITS FOUND:")
     print z
     print time.clock()
