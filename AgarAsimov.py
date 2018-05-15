@@ -92,7 +92,12 @@ def crossMeasure(x, y, GameState):
     # Take the input dot, measure the vertical and horizontal distance, return the max size.
     maxX = 0
     maxY = 0
-    color = GameState.getpixel((x + 10, y + 10))
+    try:
+        color = GameState.getpixel((x + 10, y + 10))
+    except KeyboardInterrupt:
+        print '\n'
+    except:
+        color = GameState.getpixel((x, y))
 
     # Measuring X & Y length of same color
     for i in xrange(x, 220, -1):
@@ -125,8 +130,7 @@ def crossMeasure(x, y, GameState):
 def letsPlay():
     # TODO: So this scans the screen in a smaller range around the bot, and plays based off that.
     #
-    #       1) Need to skip a certain scan length to avoid re-measuring/scanning the same unit many times - DONE
-    #       1.5) Need to initialize skipping self
+    #       1) Need to initialize skipping self
     #       2) Need to ensure measurement size is accurate
     #       3) Need to find a way to distinguuish dots from viruses.
     #       4) Need to actually implement the AI lol
@@ -147,6 +151,8 @@ def letsPlay():
     for x in xrange(0, 2160, 15): # For smaller window use 220 to 1920
         for y in xrange(topBuffer, bottomBound, 15): # For smaller window use 360 to 1220
             # Skipping ranges where we already know something is there
+            # TODO: THIS WILL SKIP UNITS LINED UP VERTICALLY
+            #       Also, this skips rectangular ranges, but the units found are circular
             for skipRange in skipRanges:
                 if (x > skipRange[0] and x < skipRange[1]):
                     if (y > skipRange[2] and y < skipRange[3]):
@@ -158,14 +164,20 @@ def letsPlay():
             if color != backgroundTileColor:
                 measure = crossMeasure(x, y, GameState)
                 if measure != 0:
-                    skipRanges.append((x, x + measure[2] / 2, y, y + measure[2])) # Appends another range of values to skip over
-                    print "X, Y, measure: ", x, " ", y, " ", measure
+                    skipRanges.append((x, x + measure[2], y, y + measure[2] / 2)) # Appends another range of values to skip over
+                    print "X, Y, measure: ", x, " ", y, " ", measure, color
                     z += 1
 
     # Key Performance Indicators
     print("TOTAL NUMBER of UNITS FOUND:")
     print z
     print time.clock()
+
+    # Testing for accurate unit detection
+    time.sleep(10)
+    for s in skipRanges:
+        pyautogui.moveTo(s[0], s[2], .2)
+        time.sleep(1)
 
 
 
