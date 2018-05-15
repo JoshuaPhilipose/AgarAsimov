@@ -7,13 +7,14 @@ import numpy
 from PIL import Image
 from PIL import ImageGrab
 
-#TODO: Come up with a better organizatioal structure, right now the newest portions just go at the bottom
+#TODO: Come up with a better organizational structure, right now the newest portions just go at the bottom
 
 mouseSpeed = .4
 center = (1080, 760)
 topBuffer = 140
 bottomBound = 1380
 backgroundTileColor = (242, 251, 255)
+alive = False
 
 # Loading the Game
 def loadGame():
@@ -23,6 +24,8 @@ def loadGame():
     for i in range(1, 16):
         print "AI Takes Over in: " , (16 - i)
         time.sleep(1)
+    global alive
+    alive = True
 
     #TODO: Below code caused bot to be flagged as a bot. Implement login sequence that beats Miniclip's bot-scanner.
 
@@ -142,42 +145,63 @@ def letsPlay():
     #       Can store smaller blobs rewards as measurement size, store larger ones as negative size
     #       First priority is staying alive, second is growing larger - utilize living reward to disincentivize hiding 24/7
 
-    # Initializing
-    time.clock()
-    GameState = pyautogui.screenshot('GameState.png')
-    z = 0
+    global alive
+    while alive:
+        # Initializing
+        startTime = time.time()
 
-    skipRanges = [(1807, 2142, 152, 567)] # Initialized with the coordinates of the leaderboard
-    for x in xrange(0, 2160, 15): # For smaller window use 220 to 1920
-        for y in xrange(topBuffer, bottomBound, 15): # For smaller window use 360 to 1220
-            # Skipping ranges where we already know something is there
-            # TODO: THIS WILL SKIP UNITS LINED UP VERTICALLY
-            #       Also, this skips rectangular ranges, but the units found are circular
-            for skipRange in skipRanges:
-                if (x > skipRange[0] and x < skipRange[1]):
-                    if (y > skipRange[2] and y < skipRange[3]):
-                        x = min(skipRange[1], 2159)
-                        y = min(skipRange[3], bottomBound)
+        GameState = pyautogui.screenshot('GameState.png')
+        z = 0
+        map = {}
 
-            # Identifying and measuring units
-            color = GameState.getpixel((x, y))
-            if color != backgroundTileColor:
-                measure = crossMeasure(x, y, GameState)
-                if measure != 0:
-                    skipRanges.append((x, x + measure[2], y, y + measure[2] / 2)) # Appends another range of values to skip over
-                    print "X, Y, measure: ", x, " ", y, " ", measure, color
-                    z += 1
+        skipRanges = [(1800, 2142, 152, 567)] # Initialized with the coordinates of the leaderboard
+        prevColor = backgroundTileColor
+        for x in xrange(0, 2160, 15): # For smaller window use 220 to 1920
+            for y in xrange(topBuffer, bottomBound, 15): # For smaller window use 360 to 1220
+                # Skipping ranges where we already know something is there
+                # TODO: Ensure it doesnt skip units lined up vertically
+                #       Also, this skips rectangular ranges, but the units found are circular
+                for skipRange in skipRanges:
+                    if (x > skipRange[0] and x < skipRange[1]):
+                        if (y > skipRange[2] and y < skipRange[3]):
+                            #x = min(skipRange[1], 2159)
+                            y = min(skipRange[3], bottomBound)
 
-    # Key Performance Indicators
-    print("TOTAL NUMBER of UNITS FOUND:")
-    print z
-    print time.clock()
+                # Identifying and measuring units
+                color = GameState.getpixel((x, y))
+                if color != backgroundTileColor and color != prevColor:
+                    measure = crossMeasure(x, y, GameState)
+                    if measure != 0:
+                        skipRanges.append((x, x + measure[2], y - measure[2], y + measure[2] / 2)) # Appends another range of values to skip over
+                        if (measure < 70):
+                            map[(x, y)] = measure[2]
+                        else:
+                            map[(x, y)] = -1 * measure[2]
+
+                        # print "X, Y, measure: ", x, " ", y, " ", measure, color
+                        z += 1
+                prevColor = color
+
+        # This is just brute force, doesn't discount future rewards - change!
+        optimalDirection = max(map, key=map.get)
+        translateAndMove(optimalDirection[0], optimalDirection[1])
+
+        gameOverColor = (255, 255, 255)
+        if GameState.getpixel((1080, 222)) == gameOverColor:
+            alive = False
+
+        # Key Performance Indicators
+        # print("TOTAL NUMBER of UNITS FOUND:")
+        # print z
+        endTime = time.time()
+        print endTime - startTime
 
     # Testing for accurate unit detection
-    time.sleep(10)
-    for s in skipRanges:
-        pyautogui.moveTo(s[0], s[2], .2)
-        time.sleep(1)
+    # Amazing test, just pulled up a fullscreen version of the gamestate and had it identify units
+    # time.sleep(10)
+    # for s in skipRanges:
+    #     pyautogui.moveTo(s[0], (s[2] +  s[3]) / 2, .2)
+    #     time.sleep(1)
 
 
 
