@@ -11,7 +11,9 @@ from PIL import ImageGrab
 
 mouseSpeed = .4
 center = (1080, 760)
-topBuffer = 140
+topBound = 140
+leftBound = 0
+rightBound = 2160
 bottomBound = 1380
 backgroundTileColor = (242, 251, 255)
 alive = False
@@ -91,7 +93,7 @@ def flee(x, y):
     tup = regToPyCoords(tup[0], tup[1])
     translateAndMove(tup[0], tup[1])
 
-def crossMeasure(x, y, GameState):
+def crossMeasure(x, y, GameState, gap):
     # Take the input dot, measure the vertical and horizontal distance, return the max size.
     maxX = 0
     maxY = 0
@@ -103,24 +105,24 @@ def crossMeasure(x, y, GameState):
         color = GameState.getpixel((x, y))
 
     # Measuring X & Y length of same color
-    for i in xrange(x, 220, -1):
+    for i in xrange(x, leftBound, -1 * gap):
         if GameState.getpixel((i, y)) == color:
-            maxX += 1
+            maxX += gap
         else:
             break
-    for i in xrange(x, 1920, 1):
+    for i in xrange(x, rightBound, gap):
         if GameState.getpixel((i, y)) == color:
-            maxX += 1
+            maxX += gap
         else:
             break
-    for j in xrange(y, 360, -1):
+    for j in xrange(y, topBound, -1 * gap):
         if GameState.getpixel((x, j)) == color:
-            maxY += 1
+            maxY += gap
         else:
             break
-    for j in xrange(y, 1220, 1):
+    for j in xrange(y, bottomBound, gap):
         if GameState.getpixel((x, j)) == color:
-            maxY += 1
+            maxY += gap
         else:
             break
 
@@ -135,11 +137,11 @@ def letsPlay():
     #
     #       1) Need to initialize skipping self
     #       2) Need to ensure measurement size is accurate
-    #       3) Need to find a way to distinguuish dots from viruses.
+    #       3) Need to find a way to distinguish dots from viruses.
     #       4) Need to actually implement the AI lol
 
     # TODO: The AI is essentially solving this problem:
-    #           Given the input gamestate, which output direction should the agent go in to maximize ouur score?
+    #           Given the input gamestate (144 x 96 matrix), which output direction should the agent go in to maximize our score?
     #       Training Data should be stored in separate file to allow for multi-session memory
     #       3 Possible outputs are mouse movement, splitting, and shooting out a blob
     #       Can store smaller blobs rewards as measurement size, store larger ones as negative size
@@ -151,30 +153,53 @@ def letsPlay():
         startTime = time.time()
 
         GameState = pyautogui.screenshot('GameState.png')
-        z = 0
-        map = {}
+        gameOverColor = (255, 255, 255)
+        if GameState.getpixel((1080, 222)) == gameOverColor:
+            alive = False
+            break
 
-        skipRanges = [(1800, 2142, 152, 567)] # Initialized with the coordinates of the leaderboard
+        z = 0
+        # map = {}
+        map = numpy.zeroes((9, 9))
+
+        skipRanges = [(1806, 2142, 152, 567)] # Initialized with the coordinates of the leaderboard
         prevColor = backgroundTileColor
-        for x in xrange(0, 2160, 15): # For smaller window use 220 to 1920
-            for y in xrange(topBuffer, bottomBound, 15): # For smaller window use 360 to 1220
+
+        # TODO: What we need is a series of maps. Closest one has high density, but short around the agent.
+        #       mid range is mid, entire screen has very wide sweep. calculate an optimal policy for each,
+        #       then calculate final policy based off weights.
+
+        # skipRange.append((360, 1800, 240, 1200))
+        # for x in xrange(leftBound, rightBound, 360):
+        #     for y in xrange(topBound, bottomBound, 240):
+        #         for skipRange in skipRanges:
+        #             if (x > skipRange[0] and x < skipRange[1]):
+        #                 if (y > skipRange[2] and y < skipRange[3]):
+        #                     y = min(skipRange[3], bottomBound)
+        #
+        # del skipRange[1]
+        # For smaller window use 220 to 1920, bigger use 0 to 2160
+
+        # TODO: just make a 9x9 grid of "feelers" then use value iteration to decide between up, down, left, right
+        for x in xrange(leftBound, rightBound, 15):
+            # For smaller window use 360 to 1220, bigger use topBound to bottomBound
+            for y in xrange(topBound, bottomBound, 15):
                 # Skipping ranges where we already know something is there
-                # TODO: Ensure it doesnt skip units lined up vertically
-                #       Also, this skips rectangular ranges, but the units found are circular
+                # TODO: This skips rectangular ranges, but the units found are circular
                 for skipRange in skipRanges:
                     if (x > skipRange[0] and x < skipRange[1]):
                         if (y > skipRange[2] and y < skipRange[3]):
-                            #x = min(skipRange[1], 2159)
                             y = min(skipRange[3], bottomBound)
 
                 # Identifying and measuring units
                 color = GameState.getpixel((x, y))
                 if color != backgroundTileColor and color != prevColor:
-                    measure = crossMeasure(x, y, GameState)
+                    measure = crossMeasure(x, y, GameState, 2)
                     if measure != 0:
-                        skipRanges.append((x, x + measure[2], y - measure[2], y + measure[2] / 2)) # Appends another range of values to skip over
-                        if (measure < 70):
-                            map[(x, y)] = measure[2]
+                        # Appends another range of values to skip over
+                        skipRanges.append((x, x + measure[2], y - measure[2], y + measure[2] / 2))
+                        if (measure < 400): #TODO: Change this 40 to agent's size / 1.3
+                            map[measure[2]] = measure[2](x, y)
                         else:
                             map[(x, y)] = -1 * measure[2]
 
@@ -195,6 +220,8 @@ def letsPlay():
         # print z
         endTime = time.time()
         print endTime - startTime
+        # END OF WHILE LOOP
+# END OF letsPlay()
 
     # Testing for accurate unit detection
     # Amazing test, just pulled up a fullscreen version of the gamestate and had it identify units
