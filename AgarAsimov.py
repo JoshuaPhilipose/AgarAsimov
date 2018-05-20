@@ -88,10 +88,9 @@ def sampleMovement():
 def flee(x, y):
     # Flees in the direction opposite the given coordinate
     tup = pyToRegCoords(x, y)
-    tup[0] = -tup[0]
-    tup[1] = -tup[1]
-    tup = regToPyCoords(tup[0], tup[1])
-    translateAndMove(tup[0], tup[1])
+    newTup = (-tup[0], -tup[1])
+    newestTup = regToPyCoords(newTup[0], newTup[1])
+    translateAndMove(newestTup[0], newestTup[1])
 
 def crossMeasure(x, y, GameState, gap):
     # Take the input dot, measure the vertical and horizontal distance, return the max size.
@@ -147,23 +146,41 @@ def letsPlay():
     #       Can store smaller blobs rewards as measurement size, store larger ones as negative size
     #       First priority is staying alive, second is growing larger - utilize living reward to disincentivize hiding 24/7
 
+    totalTimeAlive = time.time()
+    hostileMap = numpy.zeros((9, 9))
+
     global alive
     while alive:
         # Initializing
         startTime = time.time()
 
+        z = 0
+        # map = {}
+        sizeThreshhold = 70
+        skipRanges = [(1806, 2142, 152, 567)] # Initialized with the coordinates of the leaderboard
+        prevColor = backgroundTileColor
+
         GameState = pyautogui.screenshot('GameState.png')
         gameOverColor = (255, 255, 255)
         if GameState.getpixel((1080, 222)) == gameOverColor:
             alive = False
+            print "hostileMap at death: ", hostileMap
+            print "TOTAL TIME ALIVE: ", time.time() - totalTimeAlive, " seconds."
             break
+        hostileMap = numpy.zeros((9, 9))
 
-        z = 0
-        # map = {}
-        map = numpy.zeroes((9, 9))
-
-        skipRanges = [(1806, 2142, 152, 567)] # Initialized with the coordinates of the leaderboard
-        prevColor = backgroundTileColor
+        # TODO: just make a 9x9 grid of "feelers" then use value iteration to decide between up, down, left, right
+        for x in xrange(9):
+            for y in xrange(9):
+                xCoord = 360 + x * 180
+                yCoord = 240 + y * 120
+                color = GameState.getpixel((xCoord, yCoord))
+                if color != backgroundTileColor and color != prevColor:
+                    measure = crossMeasure(xCoord, yCoord, GameState, 10)
+                    if measure > sizeThreshhold:
+                        hostileMap[x, y] = measure[2]
+                        flee(xCoord, yCoord)
+        hostileMap = numpy.zeros((9, 9))
 
         # TODO: What we need is a series of maps. Closest one has high density, but short around the agent.
         #       mid range is mid, entire screen has very wide sweep. calculate an optimal policy for each,
@@ -180,46 +197,41 @@ def letsPlay():
         # del skipRange[1]
         # For smaller window use 220 to 1920, bigger use 0 to 2160
 
-        # TODO: just make a 9x9 grid of "feelers" then use value iteration to decide between up, down, left, right
-        for x in xrange(leftBound, rightBound, 15):
-            # For smaller window use 360 to 1220, bigger use topBound to bottomBound
-            for y in xrange(topBound, bottomBound, 15):
-                # Skipping ranges where we already know something is there
-                # TODO: This skips rectangular ranges, but the units found are circular
-                for skipRange in skipRanges:
-                    if (x > skipRange[0] and x < skipRange[1]):
-                        if (y > skipRange[2] and y < skipRange[3]):
-                            y = min(skipRange[3], bottomBound)
-
-                # Identifying and measuring units
-                color = GameState.getpixel((x, y))
-                if color != backgroundTileColor and color != prevColor:
-                    measure = crossMeasure(x, y, GameState, 2)
-                    if measure != 0:
-                        # Appends another range of values to skip over
-                        skipRanges.append((x, x + measure[2], y - measure[2], y + measure[2] / 2))
-                        if (measure < 400): #TODO: Change this 40 to agent's size / 1.3
-                            map[measure[2]] = measure[2](x, y)
-                        else:
-                            map[(x, y)] = -1 * measure[2]
-
-                        # print "X, Y, measure: ", x, " ", y, " ", measure, color
-                        z += 1
-                prevColor = color
-
-        # This is just brute force, doesn't discount future rewards - change!
-        optimalDirection = max(map, key=map.get)
-        translateAndMove(optimalDirection[0], optimalDirection[1])
-
-        gameOverColor = (255, 255, 255)
-        if GameState.getpixel((1080, 222)) == gameOverColor:
-            alive = False
+        # for x in xrange(leftBound, rightBound, 15):
+        #     # For smaller window use 360 to 1220, bigger use topBound to bottomBound
+        #     for y in xrange(topBound, bottomBound, 15):
+        #         # Skipping ranges where we already know something is there
+        #         # TODO: This skips rectangular ranges, but the units found are circular
+        #         for skipRange in skipRanges:
+        #             if (x > skipRange[0] and x < skipRange[1]):
+        #                 if (y > skipRange[2] and y < skipRange[3]):
+        #                     y = min(skipRange[3], bottomBound)
+        #
+        #         # Identifying and measuring units
+        #         color = GameState.getpixel((x, y))
+        #         if color != backgroundTileColor and color != prevColor:
+        #             measure = crossMeasure(x, y, GameState, 2)
+        #             if measure != 0:
+        #                 # Appends another range of values to skip over
+        #                 skipRanges.append((x, x + measure[2], y - measure[2], y + measure[2] / 2))
+        #                 if (measure < 400): #TODO: Change this 40 to agent's size / 1.3
+        #                     map[measure[2]] = measure[2](x, y)
+        #                 else:
+        #                     map[(x, y)] = -1 * measure[2]
+        #
+        #                 # print "X, Y, measure: ", x, " ", y, " ", measure, color
+        #                 z += 1
+        #         prevColor = color
+        #
+        # # This is just brute force, doesn't discount future rewards - change!
+        # optimalDirection = max(map, key=map.get)
+        # translateAndMove(optimalDirection[0], optimalDirection[1])
 
         # Key Performance Indicators
         # print("TOTAL NUMBER of UNITS FOUND:")
         # print z
         endTime = time.time()
-        print endTime - startTime
+        print "Loop took ", endTime - startTime, " seconds."
         # END OF WHILE LOOP
 # END OF letsPlay()
 
